@@ -1,0 +1,267 @@
+openapi: "3.0.3"
+info:
+  title: Vuln Demo App
+  description: |
+    Deliberately vulnerable Java web application for AWS Security Agent
+    penetration testing demonstrations. Exposes 7 OWASP vulnerability
+    categories through a simple HTTP interface.
+  version: "1.0.0"
+  contact:
+    name: Demo
+servers:
+  - url: http://3.112.14.68
+    description: EC2 direct access
+  - url: http://threetier-alb-1745291565.ap-northeast-1.elb.amazonaws.com
+    description: ALB endpoint
+
+paths:
+  /:
+    get:
+      summary: Home page
+      operationId: index
+      tags: [UI]
+      responses:
+        "200":
+          description: HTML index page with links to all vulnerability endpoints
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /search:
+    get:
+      summary: "User search (⚠️ SQL Injection)"
+      operationId: search
+      tags: [Vulnerability]
+      description: |
+        Searches users by username. Vulnerable to SQL injection via
+        direct string concatenation in the query.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+          description: Search term — injected directly into SQL LIKE clause
+          examples:
+            normal:
+              value: admin
+              summary: Normal search
+            sqli:
+              value: "' OR '1'='1"
+              summary: SQL injection to dump all users
+      responses:
+        "200":
+          description: HTML table of matching users
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /greet:
+    get:
+      summary: "Greeting page (⚠️ Reflected XSS)"
+      operationId: greet
+      tags: [Vulnerability]
+      description: |
+        Returns an HTML greeting. User input is embedded directly into
+        the response without escaping.
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: World
+          description: Name to greet — rendered unescaped in HTML
+          examples:
+            normal:
+              value: Alice
+            xss:
+              value: "<script>alert('XSS')</script>"
+              summary: Reflected XSS payload
+      responses:
+        "200":
+          description: Raw HTML greeting
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /file:
+    get:
+      summary: "File reader (⚠️ Path Traversal)"
+      operationId: readFile
+      tags: [Vulnerability]
+      description: |
+        Reads a file from /tmp/{name}. No path validation is performed,
+        allowing directory traversal to read arbitrary files.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Filename relative to /tmp — no sanitization
+          examples:
+            normal:
+              value: test.txt
+            traversal:
+              value: "../../etc/passwd"
+              summary: Path traversal to read /etc/passwd
+      responses:
+        "200":
+          description: File contents or error message
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /ping:
+    get:
+      summary: "Ping host (⚠️ Command Injection)"
+      operationId: ping
+      tags: [Vulnerability]
+      description: |
+        Executes `ping -c 1 {host}` via /bin/sh. User input is passed
+        directly to the shell without sanitization.
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Host to ping — passed directly to shell
+          examples:
+            normal:
+              value: "127.0.0.1"
+            injection:
+              value: ";cat /etc/passwd"
+              summary: Command injection via shell metacharacter
+      responses:
+        "200":
+          description: Ping output or injected command output
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /fetch:
+    get:
+      summary: "URL fetcher (⚠️ SSRF)"
+      operationId: fetch
+      tags: [Vulnerability]
+      description: |
+        Fetches content from an arbitrary URL. No allowlist or validation
+        is applied, enabling access to internal services and cloud metadata.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: URL to fetch — no validation
+          examples:
+            normal:
+              value: "https://example.com"
+            ssrf:
+              value: "http://169.254.169.254/latest/meta-data/"
+              summary: SSRF to EC2 instance metadata
+      responses:
+        "200":
+          description: Fetched content or error message
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /note/{id}:
+    get:
+      summary: "Read note (⚠️ IDOR)"
+      operationId: getNote
+      tags: [Vulnerability]
+      description: |
+        Returns a note by ID. No authorization check is performed —
+        any user can read any note including admin secrets.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Note ID — no ownership verification
+          examples:
+            admin_note:
+              value: 1
+              summary: Admin's secret note (IDOR)
+            user_note:
+              value: 2
+      responses:
+        "200":
+          description: Note content or "Not found"
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /debug:
+    get:
+      summary: "Debug info (⚠️ Sensitive Data Exposure)"
+      operationId: debug
+      tags: [Vulnerability]
+      description: |
+        Exposes system properties and hardcoded secrets including
+        database passwords and API keys.
+      responses:
+        "200":
+          description: JSON object with system info and secrets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DebugInfo"
+              example:
+                java.version: "17.0.18"
+                os.name: "Linux"
+                user.dir: "/home/ec2-user"
+                DB_PASSWORD: "P@ssw0rd!"
+                API_KEY: "DEMOAPIKEYsfsa23sfasdkdf"
+
+  /h2-console:
+    get:
+      summary: "H2 Database Console (⚠️ Misconfiguration)"
+      operationId: h2Console
+      tags: [Vulnerability]
+      description: |
+        H2 web console exposed with remote access enabled.
+        Default connection: jdbc:h2:mem:vulndb, user SA, no password.
+      responses:
+        "200":
+          description: H2 Console HTML interface
+          content:
+            text/html:
+              schema:
+                type: string
+
+components:
+  schemas:
+    DebugInfo:
+      type: object
+      properties:
+        java.version:
+          type: string
+        os.name:
+          type: string
+        user.dir:
+          type: string
+        DB_PASSWORD:
+          type: string
+        API_KEY:
+          type: string
+
+tags:
+  - name: UI
+    description: User interface pages
+  - name: Vulnerability
+    description: Endpoints with intentional security vulnerabilities

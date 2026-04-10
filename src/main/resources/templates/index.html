@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html><head><title>Vuln Demo App</title></head>
+<body>
+<h1>Vulnerable Demo App - Security Agent Pen Test Target</h1>
+<ul>
+  <li><a href="/search">SQL Injection - User Search</a></li>
+  <li><a href="/greet?name=World">XSS - Greeting</a></li>
+  <li><a href="/ping?host=127.0.0.1">Command Injection - Ping</a></li>
+  <li><a href="/file?name=test.txt">Path Traversal - File Read</a></li>
+  <li><a href="/fetch?url=http://169.254.169.254/latest/meta-data/">SSRF - URL Fetch</a></li>
+  <li><a href="/note/1">IDOR - Read Note</a></li>
+  <li><a href="/debug">Info Disclosure - Debug Endpoint</a></li>
+</ul>
+</body></html>

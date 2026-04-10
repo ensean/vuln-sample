@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"><head><title>Search</title></head>
+<body>
+<h1>User Search</h1>
+<form action="/search" method="get">
+  <input type="text" name="q" th:value="${q}" placeholder="Search username..."/>
+  <button type="submit">Search</button>
+</form>
+<p th:if="${error}" th:text="'Error: '+${error}" style="color:red"></p>
+<table border="1" th:if="${!results.isEmpty()}">
+  <tr><th>ID</th><th>Username</th><th>Role</th></tr>
+  <tr th:each="r : ${results}"><td th:text="${r.id}"/><td th:text="${r.username}"/><td th:text="${r.role}"/></tr>
+</table>
+<a href="/">Back</a>
+</body></html>
